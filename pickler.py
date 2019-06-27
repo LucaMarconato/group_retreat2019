@@ -13,4 +13,5 @@ def load_from_pickle_or_build_and_save_it(pickle_name: str, build_data):
         data = build_data()
         os.makedirs('pickles', exist_ok=True)
         pickle.dump(data, open(pickle_file_path, 'wb'))
+        print('pickle written')
     return data
