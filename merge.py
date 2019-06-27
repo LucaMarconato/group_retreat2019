@@ -44,23 +44,22 @@ def load_and_merge_methylation_data_from_folder_make_closure(folder_path: str):
 
         unique_positions = get_unique_start_positions_from_folder(folder_path)
 
-        # nan_values = [[np.nan] * len(files)] * len(unique_positions)
-        merged = pd.DataFrame(index=sorted(unique_positions), columns=[files])
-
+        merged = pd.DataFrame(index=unique_positions)
+        merged.index.names = ['start_position']
         bar.start()
         start_positions_to_indexes = dict()
-        i = 0
-        for start_position in unique_positions:
-            start_positions_to_indexes[start_position] = i
-            i += 1
         i = 1
         for file in files:
+            column = pd.DataFrame(index=unique_positions)
+            column.index.names = ['start_position']
             df = load_methylation_dataframe_for_file(file)
-            for index, row in df.iterrows():
-                row_index = start_positions_to_indexes[row['start_position']]
-                column_index = i - 1
-                value = row['methylation_state']
-                merged.iat[row_index, column_index] = value
+            df.set_index(['start_position'], inplace=True)
+            merged_column = pd.merge(column, df, how='outer', on='start_position')
+            merged_column_duplicates_removed = merged_column.groupby(['start_position']).mean()
+            merged = pd.concat([merged, merged_column_duplicates_removed], axis=1)
+            merged.rename(columns={merged.columns[-1]: file}, inplace=True)
+
+            # merged[file] = merged_column['methylation_state']
             bar.update(i)
             i += 1
         bar.finish()
@@ -79,3 +78,10 @@ young_methylation_folder_path = 'MethylationData/Imputed/UD/'
 old_methylation_folder_path = 'MethylationData/Imputed/D3/'
 young_methylation_df = load_and_merge_methylation_data_from_folder(young_methylation_folder_path)
 old_methylation_df = load_and_merge_methylation_data_from_folder(old_methylation_folder_path)
+
+# export a .tsv (tab separated values) file
+os.makedirs('exported', exist_ok=True)
+young_methylation_df.to_csv('exported/young_methylation.tsv', sep='\t')
+old_methylation_df.to_csv('exported/old_methylation.tsv', sep='\t')
+
+print('done')
