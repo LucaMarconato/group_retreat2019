@@ -1,12 +1,13 @@
 import pandas as pd
 
-def print_full(df) -> None:
+
+def print_full(df: pd.DataFrame) -> None:
     """
     Prints the full content of the pandas dataframe (which is otherwise truncated)
 
     :param x: pandas dataframe to print
     """
-    pd.set_option('didfsplay.max_rows', len(df))
+    pd.set_option('display.max_rows', len(df))
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', 2000)
     pd.set_option('display.float_format', '{:20,.2f}'.format)
