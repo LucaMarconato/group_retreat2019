@@ -1,0 +1,123 @@
+# annotations
+
+relevant = read.delim(file = "../CompetitionRetreat/Annotation/relevantCellAnnotation.txt")
+
+feature = read.delim(file = "../CompetitionRetreat/Annotation/featureAnnotation.txt")
+rownames(feature) <- feature[,1]
+feature <- feature[,2:ncol(feature)]
+feature <- feature[,c("start_position","end_position","strand")]
+  
+# transcript
+ud = read.delim(file = "../CompetitionRetreat/ExpressionMatrix/exprs_UD.txt",header = T,check.names = F)
+rownames(ud) = as.character(ud[,1])
+ud = ud[,2:ncol(ud)]
+ud_barcodes = colnames(ud)
+
+d3 = read.delim(file = "../CompetitionRetreat/ExpressionMatrix/exprs_D3_test.txt",header = T,check.names = F)
+rownames(d3) = d3[,1]
+d3 = d3[,2:ncol(d3)]
+d3_barcodes = colnames(d3)
+
+# met count
+length(list.files("../CompetitionRetreat/MethylationData/Imputed/UD/",pattern = ".bedGraph.gz"))
+length(list.files("../CompetitionRetreat/MethylationData/Imputed/D3/",pattern = ".bedGraph.gz"))
+
+# merge transcript data
+merged_tran = merge(x = ud,y = d3,by = "row.names",all = F)
+rownames(merged_tran) = merged_tran[,1] 
+merged_tran = merged_tran[,2:ncol(merged_tran)]
+
+all_zeros = merged_tran[which(rowSums(merged_tran) == 0),]
+
+# 
+
+merged_tran_keep <- merged_tran[setdiff(rownames(merged_tran),rownames(all_zeros)),]
+
+info=c()
+for(i in seq(1,nrow(merged_tran_keep))){
+  a <- as.numeric(merged_tran_keep[i,ud_barcodes])
+  b <- as.numeric(merged_tran_keep[i,d3_barcodes])
+  test <- wilcox.test(a,b)
+  this <- data.frame(gene=rownames(merged_tran_keep)[i],
+                     pvalue=test$p.value,
+                     value_ud=mean(a),
+                     value_d3=mean(b),
+                     stringsAsFactors = F)
+  info <- rbind(info,this)
+}
+
+diff_trans <- merged_tran_keep[info$gene[which(info$pvalue < 0.01)],]
+
+prom_tab <- feature[rownames(diff_trans),] 
+
+# pos strand
+prom_tab$start_position[which(prom_tab$strand == 1)] <-  prom_tab$start_position[which(prom_tab$strand == 1)] - 1500
+prom_tab$end_position[which(prom_tab$strand == 1)] <- prom_tab$start_position[which(prom_tab$strand == 1)] + 200
+
+# neg strand
+prom_tab$start_position[which(prom_tab$strand == -1)] <- prom_tab$end_position[which(prom_tab$strand == -1)] - 200
+prom_tab$end_position[which(prom_tab$strand == -1)] <- prom_tab$end_position[which(prom_tab$strand == -1)] + 1500
+
+head(prom_tab)
+
+# import methylation table
+
+library(data.table)
+library(R.utils)
+
+# UD
+bedgraph = list.files("../CompetitionRetreat/MethylationData/Imputed/UD/",pattern = ".bedGraph.gz",full.names = T)
+
+pos_cpg = c()
+for(gz in bedgraph){
+  message(basename(gz))
+  a <- fread(file = gz,header = F,select = c(2,4),data.table = T)
+  pos_cpg <- c(pos_cpg,unique(a$V2))
+}
+pos_cpg <- unique(pos_cpg)
+pos_cpg <- sort(pos_cpg)
+cpgtab_ud <- data.frame(cpg_start=pos_cpg,stringsAsFactors = F)
+for(gz in bedgraph){
+  message(basename(gz))
+  a <- fread(file = gz,header = F,select = c(2,4),data.table = T)
+  a <- unique(a)
+  dups <- a$V2[which(duplicated(a$V2))]
+  a <- data.frame(a,stringsAsFactors = F)
+  a <- a[which(!a$V2 %in% dups),]
+  colnames(a) <- c("cpg_start",basename(gz))
+  cpgtab_ud <- merge(x = cpgtab_ud,y = a,by = "cpg_start",all.x = TRUE)
+}
+
+head(cpgtab_ud)
+
+# D3
+bedgraph = list.files("../CompetitionRetreat/MethylationData/Imputed/D3/",pattern = ".bedGraph.gz",full.names = T)
+
+pos_cpg = c()
+for(gz in bedgraph){
+  message(basename(gz))
+  a <- fread(file = gz,header = F,select = c(2,4),data.table = T)
+  pos_cpg <- c(pos_cpg,unique(a$V2))
+}
+pos_cpg <- unique(pos_cpg)
+pos_cpg <- sort(pos_cpg)
+
+cpgtab_d3 <- data.frame(cpg_start=pos_cpg,stringsAsFactors = F)
+for(gz in bedgraph){
+  message(basename(gz))
+  a <- fread(file = gz,header = F,select = c(2,4),data.table = T)
+  a <- unique(a)
+  dups <- a$V2[which(duplicated(a$V2))]
+  a <- data.frame(a,stringsAsFactors = F)
+  a <- a[which(!a$V2 %in% dups),]
+  colnames(a) <- c("cpg_start",basename(gz))
+  cpgtab_d3 <- merge(x = cpgtab_d3,y = a,by = "cpg_start",all.x = TRUE)
+}
+
+save(cpgtab_d3,cpgtab_ud,file="met_merged_tables.RData")
+
+head(cpgtab_d3)
+
+
+
+
