@@ -2,6 +2,7 @@ import os
 from typing import Set
 
 import pandas as pd
+import numpy as np
 import progressbar
 
 from pickler import load_from_pickle_or_build_and_save_it
@@ -81,7 +82,24 @@ old_methylation_df = load_and_merge_methylation_data_from_folder(old_methylation
 
 # export a .tsv (tab separated values) file
 os.makedirs('exported', exist_ok=True)
-young_methylation_df.to_csv('exported/young_methylation.tsv', sep='\t')
-old_methylation_df.to_csv('exported/old_methylation.tsv', sep='\t')
+young_methylation_exported_path = 'exported/young_methylation.tsv'
+old_methylation_exported_path = 'exported/old_methylation.tsv'
+if not os.path.isfile(young_methylation_exported_path):
+    young_methylation_df.to_csv(young_methylation_exported_path, sep='\t')
+if not os.path.isfile(old_methylation_exported_path):
+    old_methylation_df.to_csv(old_methylation_exported_path, sep='\t')
+
+# read the trascription data
+young_transcription_df = pd.read_csv('ExpressionMatrix/exprs_UD.txt', sep='\t')
+old_transcription1_known_df = pd.read_csv('ExpressionMatrix/exprs_D3_test.txt', sep='\t')
+old_transcription1_unknown_df = pd.read_csv('ExpressionMatrix/exprs_D3_validation_baseLine.txt', sep='\t')
+old_transcription_merged_df = old_transcription1_known_df
+for column in old_transcription1_unknown_df.columns.values:
+    old_transcription_merged_df[column] = old_transcription1_unknown_df[column]
+    old_transcription_merged_df[column] = [np.nan] * len(old_transcription_merged_df)
+
+# read the annotation data
+transcription_annotation_df = pd.read_csv('Annotation/featureAnnotation.txt', sep='\t')
+single_cell_annotation_df = pd.read_csv('Annotation/relevantCellAnnotation.txt', sep='\t')
 
 print('done')
